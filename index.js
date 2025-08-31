@@ -1,16 +1,15 @@
 import express from 'express';
-import { chromium } from 'playwright';   // توجه کن: این بار playwright معمولی لازمه (نه playwright-chromium)
+import { chromium } from 'playwright';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 🔑 ادرس WSS از BrightData (Browser API)
+// 🔑 آدرس WSS برای BrightData Browser API
 const BROWSER_WSS = 'wss://brd-customer-hl_554193fc-zone-scraping_browser1:68b5az1ldx0k@brd.superproxy.io:9222';
 
+// تابع اتصال به مرورگر BrightData
 async function getBrowser() {
-  // اتصال به مرورگر BrightData
   const browser = await chromium.connectOverCDP(BROWSER_WSS);
-  // context ها توی Browser API از قبل وجود دارن
   const context = browser.contexts()[0] || await browser.newContext();
   return { browser, context };
 }
@@ -29,7 +28,6 @@ app.get('/myip', async (req, res) => {
 
     const body = await page.textContent('body');
     await browser.close();
-
     res.type('json').send(body);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -42,12 +40,12 @@ app.get('/test-home', async (req, res) => {
     const { browser, context } = await getBrowser();
     const page = await context.newPage();
 
-    await page.setExtraHTTPHeaders({
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36'
+    await page.goto('https://visas-de.tlscontact.com/en-us', {
+      waitUntil: 'domcontentloaded'
     });
 
-    await page.goto('https://visas-de.tlscontact.com/en-us', { waitUntil: 'domcontentloaded' });
     const html = await page.content();
+    console.log("Final URL:", page.url());
 
     await browser.close();
     res.type('html').send(html);
@@ -56,7 +54,7 @@ app.get('/test-home', async (req, res) => {
   }
 });
 
-// 📌 چک کردن نوبت TLSContact
+// 📌 بررسی وقت TLSContact
 app.get('/check', async (req, res) => {
   try {
     const { browser, context } = await getBrowser();
@@ -90,6 +88,30 @@ app.get('/check', async (req, res) => {
   }
 });
 
+// 📌 مسیر دیباگ → URL نهایی + اولین 1000 کاراکتر HTML
+app.get('/debug', async (req, res) => {
+  try {
+    const { browser, context } = await getBrowser();
+    const page = await context.newPage();
+
+    await page.goto('https://visas-de.tlscontact.com/en-us', {
+      waitUntil: 'domcontentloaded'
+    });
+
+    const url = page.url();
+    const html = await page.content();
+    await browser.close();
+
+    res.json({
+      final_url: url,
+      snippet: html.substring(0, 1000)  // فقط 1000 کاراکتر اول
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🚀 اجرا
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
