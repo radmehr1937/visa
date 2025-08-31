@@ -40,7 +40,7 @@ async function newPage() {
 
 // 🏠 root
 app.get('/', (req, res) => {
-  res.send('✅ Visa Checker running with BrightData Web Unlocker');
+  res.send('✅ Visa Checker running with BrightData Web Unlocker (direct Iran URL)');
 });
 
 // 📌 نمایش آی‌پی
@@ -57,25 +57,16 @@ app.get('/myip', async (req, res) => {
   }
 });
 
-// 📌 تست صفحه اصلی + انتخاب ایران + کلیک Confirm
+// 📌 تست صفحه اصلی TLSContact (مستقیم ایران)
 app.get('/test-home', async (req, res) => {
   try {
     const { browser, page } = await newPage();
 
-    // ۱) باز کردن صفحه splash
-    await page.goto('https://visas-de.tlscontact.com/en-us',
-      { waitUntil: 'domcontentloaded', timeout: 60000 });
-
-    // ۲) انتخاب کشور ایران
-    await page.waitForSelector('#select-country', { timeout: 30000 });
-    await page.selectOption('#select-country', 'ir');
-
-    // ۳) کلیک روی دکمه Confirm
-    await page.waitForSelector('#btn-confirm-country', { timeout: 30000 });
-    await page.click('#btn-confirm-country');
-
-    // ۴) کمی صبر برای ریدایرکت
-    await page.waitForTimeout(3000);
+    // ✅ مستقیماً برو روی صفحه ایران
+    await page.goto('https://visas-de.tlscontact.com/en-us/country/ir/vac/irTHR2de', {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
+    });
 
     const url = page.url();
     const html = await page.content();
@@ -83,7 +74,7 @@ app.get('/test-home', async (req, res) => {
     await browser.close();
     res.json({
       final_url: url,
-      snippet: html.substring(0, 1000)
+      snippet: html.substring(0, 1000),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -110,12 +101,12 @@ app.get('/debug-login', async (req, res) => {
   }
 });
 
-// 📌 بررسی وقت
+// 📌 بررسی وقت TLSContact
 app.get('/check', async (req, res) => {
   try {
     const { browser, page } = await newPage();
 
-    // رفتن به صفحه لاگین
+    // ورود به صفحه لاگین
     await page.goto(
       'https://auth.visas-de.tlscontact.com/auth/realms/atlas/protocol/openid-connect/auth',
       { waitUntil: 'networkidle', timeout: 60000 }
@@ -131,19 +122,13 @@ app.get('/check', async (req, res) => {
     await page.click('button[type="submit"]');
     await page.waitForNavigation({ timeout: 60000 });
 
-    // انتخاب ایران
-    await page.waitForSelector('#select-country', { timeout: 30000 });
-    await page.selectOption('#select-country', 'ir');
-    await page.waitForSelector('#btn-confirm-country', { timeout: 30000 });
-    await page.click('#btn-confirm-country');
-    await page.waitForTimeout(3000);
-
-    // رفتن به صفحه وقت
+    // ✅ مستقیماً برو به صفحه وقت ایران
     await page.goto(
-      'https://visas-de.tlscontact.com/en-us/3487969/workflow/appointment-booking?location=irTHR2de',
+      'https://visas-de.tlscontact.com/en-us/country/ir/vac/irTHR2de',
       { waitUntil: 'domcontentloaded', timeout: 60000 }
     );
 
+    // بررسی دکمه رزرو
     const available = await page.$$(
       'xpath=//*[@id="main"]/div[1]/div/div[2]/div[3]/div/div[3]/div[2]/div/div/div/div/button[not(@disabled)]'
     );
