@@ -9,7 +9,7 @@ const PROXY_SERVER = 'http://brd.superproxy.io:33335';
 const PROXY_USERNAME = 'brd-customer-hl_554193fc-zone-web_unlocker1';
 const PROXY_PASSWORD = '4jh6yy6g6e0r';
 
-// 🎛️ آرگومان‌های سخت‌گیر برای اجرا در Railway
+// 🎛️ فلگ‌های لازم برای اجرا در سرور ابری
 const CHROMIUM_ARGS = [
   '--no-sandbox',
   '--disable-setuid-sandbox',
@@ -21,39 +21,34 @@ const CHROMIUM_ARGS = [
   '--ignore-certificate-errors'
 ];
 
-// تابع برای اجرای یک Page با Unlocker Proxy
+// تابع ساخت browser و page
 async function newPage() {
   const browser = await chromium.launch({
     headless: true,
     proxy: {
       server: PROXY_SERVER,
       username: PROXY_USERNAME,
-      password: PROXY_PASSWORD,
+      password: PROXY_PASSWORD
     },
     args: CHROMIUM_ARGS,
   });
 
-  const context = await browser.newContext({
-    ignoreHTTPSErrors: true,
-  });
-
+  const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
   return { browser, page };
 }
 
-// 🏠 Root route
+// 🏠 root
 app.get('/', (req, res) => {
   res.send('✅ Visa Checker running with BrightData Web Unlocker');
 });
 
-// 📌 تست IP روی Unlocker
+// 📌 نمایش آی‌پی
 app.get('/myip', async (req, res) => {
   try {
     const { browser, page } = await newPage();
-    await page.goto('https://api.ipify.org/?format=json', {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000,
-    });
+    await page.goto('https://api.ipify.org/?format=json',
+      { waitUntil: 'domcontentloaded', timeout: 60000 });
     const body = await page.textContent('body');
     await browser.close();
     res.type('json').send(body);
@@ -62,18 +57,34 @@ app.get('/myip', async (req, res) => {
   }
 });
 
-// 📌 تست صفحه اصلی TLSContact
+// 📌 تست صفحه اصلی + انتخاب ایران + کلیک Confirm
 app.get('/test-home', async (req, res) => {
   try {
     const { browser, page } = await newPage();
-    await page.goto('https://visas-de.tlscontact.com/en-us', {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000,
-    });
+
+    // ۱) باز کردن صفحه splash
+    await page.goto('https://visas-de.tlscontact.com/en-us',
+      { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+    // ۲) انتخاب کشور ایران
+    await page.waitForSelector('#select-country', { timeout: 30000 });
+    await page.selectOption('#select-country', 'ir');
+
+    // ۳) کلیک روی دکمه Confirm
+    await page.waitForSelector('#btn-confirm-country', { timeout: 30000 });
+    await page.click('#btn-confirm-country');
+
+    // ۴) کمی صبر برای ریدایرکت
+    await page.waitForTimeout(3000);
+
+    const url = page.url();
     const html = await page.content();
-    console.log("Final URL:", page.url());
+
     await browser.close();
-    res.type('html').send(html);
+    res.json({
+      final_url: url,
+      snippet: html.substring(0, 1000)
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -99,18 +110,18 @@ app.get('/debug-login', async (req, res) => {
   }
 });
 
-// 📌 نهایی: چک نوبت TLSContact
+// 📌 بررسی وقت
 app.get('/check', async (req, res) => {
   try {
     const { browser, page } = await newPage();
 
-    // ورود به صفحه لاگین
+    // رفتن به صفحه لاگین
     await page.goto(
       'https://auth.visas-de.tlscontact.com/auth/realms/atlas/protocol/openid-connect/auth',
       { waitUntil: 'networkidle', timeout: 60000 }
     );
 
-    // پر کردن فرم (selector براساس keycloak)
+    // پر کردن فرم لاگین
     await page.waitForSelector('input[name="username"]', { timeout: 60000 });
     await page.fill('input[name="username"]', 'ozbajik@telegmail.com');
 
@@ -119,6 +130,13 @@ app.get('/check', async (req, res) => {
 
     await page.click('button[type="submit"]');
     await page.waitForNavigation({ timeout: 60000 });
+
+    // انتخاب ایران
+    await page.waitForSelector('#select-country', { timeout: 30000 });
+    await page.selectOption('#select-country', 'ir');
+    await page.waitForSelector('#btn-confirm-country', { timeout: 30000 });
+    await page.click('#btn-confirm-country');
+    await page.waitForTimeout(3000);
 
     // رفتن به صفحه وقت
     await page.goto(
