@@ -4,11 +4,11 @@ import { chromium } from 'playwright';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 🔑 BrightData Browser API (Scraping Browser)
+// 🔑 آدرس WSS برای BrightData Browser API
 const BROWSER_WSS =
   'wss://brd-customer-hl_554193fc-zone-scraping_browser1:68b5az1ldx0k@brd.superproxy.io:9222';
 
-// اتصال به مرورگر BrightData
+// تابع اتصال به مرورگر BrightData
 async function getBrowser() {
   const browser = await chromium.connectOverCDP(BROWSER_WSS);
   const context = browser.contexts()[0] || (await browser.newContext());
@@ -17,7 +17,7 @@ async function getBrowser() {
 
 // 🏠 Root route
 app.get('/', (req, res) => {
-  res.send('✅ Visa Checker is running via BrightData Browser API (with debug-login)');
+  res.send('✅ Visa Checker is running via BrightData Browser API (login selectors fixed)');
 });
 
 // 📌 نمایش آی‌پی بیرونی
@@ -64,10 +64,9 @@ app.get('/debug-login', async (req, res) => {
     const { browser, context } = await getBrowser();
     const page = await context.newPage();
 
-    // رفتن به صفحه لاگین
     await page.goto(
       'https://auth.visas-de.tlscontact.com/auth/realms/atlas/protocol/openid-connect/auth',
-      { waitUntil: 'domcontentloaded', timeout: 60000 }
+      { waitUntil: 'networkidle', timeout: 60000 }
     );
 
     const url = page.url();
@@ -90,19 +89,24 @@ app.get('/check', async (req, res) => {
     const { browser, context } = await getBrowser();
     const page = await context.newPage();
 
+    // ۱) رفتن به صفحه لاگین
     await page.goto(
       'https://auth.visas-de.tlscontact.com/auth/realms/atlas/protocol/openid-connect/auth',
-      { waitUntil: 'domcontentloaded', timeout: 60000 }
+      { waitUntil: 'networkidle', timeout: 60000 }
     );
 
-    // تلاش برای پیدا کردن فیلد لاگین
-    await page.waitForSelector('#email-input-field', { timeout: 20000 });
-    await page.fill('#email-input-field', 'ozbajik@telegmail.com');
-    await page.fill('#password-input-field', '123456Negar@');
-    await page.click('#btn-login');
+    // ۲) پر کردن ایمیل و پسورد (selector جدید)
+    await page.waitForSelector('input[name="username"]', { timeout: 60000 });
+    await page.fill('input[name="username"]', 'ozbajik@telegmail.com');
+
+    await page.waitForSelector('input[name="password"]', { timeout: 60000 });
+    await page.fill('input[name="password"]', '123456Negar@');
+
+    // ۳) کلیک دکمه Submit
+    await page.click('button[type="submit"]');
     await page.waitForNavigation({ timeout: 60000 });
 
-    // رفتن به صفحه وقت
+    // ۴) رفتن به صفحه رزرو وقت
     await page.goto(
       'https://visas-de.tlscontact.com/en-us/3487969/workflow/appointment-booking?location=irTHR2de',
       { waitUntil: 'domcontentloaded', timeout: 60000 }
